@@ -489,7 +489,7 @@ ggplot(plot_contri_data, aes(x = Variable, y = Metric, fill = Variable)) +
   theme(axis.text.x = element_text(angle = 45, hjust = 1)) 
 ```
 
-<u> Quels sont les paramètres egalement présentés comme caractéristiques dans le cours de F.Joux sur l'oligotrophie ? Quels sont les paramètres en plus et en moins ? La contribution de chaque paramètre au modèle est -elle cohérente avec les valeurs de $R^2$ des plots précédents ? </u>
+<u> Quels sont les paramètres egalement présentés comme caractéristiques dans le cours de F.Joux sur l'oligotrophie ? Quels sont les paramètres en plus et en moins ? La contribution de chaque paramètre au modèle est-elle cohérente avec les valeurs de $R^2$ des plots précédents ? </u>
 
 
 
