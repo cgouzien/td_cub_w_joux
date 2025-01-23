@@ -1,0 +1,497 @@
+---
+title: "td_cub_c_gouzien"
+output: html_document
+date: "2025-01-07"
+---
+# Objectif et introduction
+
+
+_Objectifs généraux: _
+
+Ce td vous présente un exemple d'analyse faite en bio informatique appliqué à de la génomique.
+
+À l'issue de ce td, vous devriez avoir une idée de l'ensemble des étapes (filtres, conversions, mise en forme) nécessaires à la production de graphiques pertinents, bien que celles-ci soient souvent grandement résumées dans les publications scientifiques. Ce travail mettra également en lumière la puissance des outils informatiques permettant de transformer des tableaux de données complexes en graphiques interprétables, après en avoir extrait les informations importantes. Enfin, cette rapide introduction pourra éveiller en vous un intérêt pour l'analyse de données, une discipline passionnante et de plus en plus nécessaire à une poursuite en carrière académique. 
+
+
+_Objectifs scientifiques : CUB et taux de croissance_ 
+ 
+Pour cela, nous nous intéresserons au lien entre le CUB (explication ci-après) et d'autres paramètres génétiques et biotiques. Le but final est de pouvoir prédire le taux de croissance d'une bactérie. Pas besoin de faire des expériences de cultures sur plusieurs semaines: avec les bons outils informatiques et les données génétiques, le taux de croissance est obtenu en quelques instants. La prédiction de ce taux de croissance peut avoir des applications multiples comme la compréhension du métabolisme d'une bactérie.  
+
+Le CUB vous a été introduit dans le cours sur l'oligotrophie présenté par Fabien Joux. C'est une métrique calculée à partir du génome complet annoté d'une bactérie. Il faut donc au préalable avoir séquencé le génome de notre bactérie. Puis, il faut identifier tous les gènes présents. Ces étapes préliminaires sont nécessaires à un grand nombre d'études scientifiques. C'est pour quoi il existe aujourd'hui des catalogues de génomes en ligne mettant à disposition des génomes annotés gratuitement pour l'ensemble de scientifiques. On peut mentionner les catalogues d'NCBI (USA) et de l'ENA (européen). Dans la suite du td, nous prendrons comme objet d'étude une cyanobactérie d'un genre typique des environnements aquatiques : Synechococcus elongatus (PCC_6301). Son génome annoté a été téléchargé de NCBI.
+
+<img src="/Users/gouzien-c/Downloads/Synechococcus_elongatus_PCC_7942_electron_micrograph_showing_carboxysomes.jpg"  />
+*Image d'un Synechococcus elongatus *
+
+_Comprendre le CUB_
+
+Le CUB (Codon Usage Bias ou  "Bias de codon" en français) est une métrique calculée à partir d'une séquence d'ADN (ou d'ARN). En première approximation, on retiendra que cette métrique nécessite deux informations du génome :
+- la fréquence des nucléotides A,T(ou U),C,G dans ce génome :  $f_A=n_A/n_{tot} ; f_C=n_C/n_{tot}$ etc... avec $n_{tot}=n_A+n_C+n_G+n_T$
+- la fréquence des codons dans les gènes de ce génome. Il faudra donc découper l'ensemble de notre génome annoté en codon, selon le cadre de lecture définit entre le codon start et stop du gène étudié.
+
+Au vu des besoins de cette métrique, il appairait que l'on peut la calculer à différentes échelles :  au niveau d'un gène (fréquence en A,T,C,G + codons du gène), au niveau d'un chromosome (fréquence en A,T,C,G + codons du chromosome), au niveau d'un génome (fréquence en A,T,C,G + codons du génome), au niveau d'une communauté de génome (fréquence en A,T,C,G + codons dans l'ensemble des bactéries de la communauté)...
+
+Le CUB va mettre en évidence le biais de fréquence retrouvé au sein des familles de codons synonymes. Illustrons cette phrase par un exemple : 
+Vous n’êtes pas sans savoir que le code génétique est redondant : plusieurs codons (=triplet de nucléotides) codent un même acide aminé. On retrouve 4x4x4=64 codons différents mais seulement une 20aine d'acides aminés. On a donc la plupart du temps plusieurs codons reliés au même acide aminé (Ex: AAA & AAG codent la lysine), ces codons étant appelés redondants. Si tous les codons redondants étaient uniformément répartis dans un génome, la prédiction de leur fréquence serait triviale. Exemple : L'acide aminé lysine (Lys ou K) est codé par les codons redondants AAA et AAG. Si la distribution était aléatoire, on devrait observer 50% d'AAA et 50% d'AAG dans le génome d'une bactérie. Par contre,  si on mesure des fréquences de 20/80%, on est en présence d'un biais de codon. Il y a un biais de fréquence du codon par rapport à une distribution uniforme de 50/50%. 
+
+Deuxième exemple avec l'arginine. Il y a 6 codons synonymes codant l'arginine : CGU, CGC, CGA, CGG, AGA, AGG. 
+Pas de biais = fréquence des codons selon la loi uniforme CGU=0.16, CGC=0.16, CGA=0.16, CGG=0.16 ; AGA=0.16, AGG=0.16
+Biais = on s'écarte de la loi uniforme pour certains codons. CGU=0.16, CGC=0.16, CGA=0.05, CGG=0.16 ; AGA=0.27, AGG=0.16
+
+La communautés scientifique a cherché par la suite à expliquer l'origine de ces biais. Différentes publications sur Moodle vous permettront de comprendre certaines interprétations. Je vous encourgage très vivement à lire  l'introduction de Viera_Silva & Rocha, 2010 pour comprendre le lien entre CUB, disponibilité des ARNt et ribosomes. Cela facilitera votre compréhension de la suite du td.
+
+> _The tRNA pool becomes limiting at very high growth rates. Thus, its quick turnover at ribosomes is under strong selection. This can be optimized if codons of highly expressed genes under fast growth recruit the most abundant tRNA in the cell [27]. Such codon usage bias, i.e. differential preference of some synonymous codons over others, is therefore as strong as the gene is highly expressed_, Viera_Silva & Rocha, 2010 
+
+
+_Plan du td: _
+
+Le td est divisé en 5 parties :
+
+1. Installation et chargement des outils/données nécessaires au td
+  
+2. Obtenir un CUB à partir d'un génome annoté : comparaison de deux méthodes
+  
+3. Visualiser le lien entre CUB et taux de croissance
+  
+4. Visualiser le lien entre CUB et d'autres métriques génomiques
+  
+5. Pour aller plus loin : combiner CUB et autres métriques génomiques afin d'augmenter la puissance prédictive de notre modèle
+
+_Construction du td: _
+
+Ce td utilise des packages publics, accessibles par tous les utilisateurs de R à travers le monde, ainsi que le package `td_functions` qui a été écrit spécialement pour ce td. Ce package est sous la forme d'un dossier contenant des outils/fonctions R utilisés dans le corps du td. Pour vous préciser le package d'origine des fonctions utilisées, la notation suivante est adoptée : `nom_du_package::nom_de_la_fonction` ex : `Biostrings::readDNAStringSet` -> le code fait référence à la fonction `readDNAStringSet` du package `Biostrings`
+Les packages publics sont installés automatiquement dans un dossier prévu a cet effet au sein de votre installation de R. Le package `td_functions` lui n'est pas stocké au même endroit. Vous devez préciser, à l'endroit indiqué, le chemin du dossier où il se trouve après l'avoir téléchargé du Moodle. (surement dans votre dossier Download)
+
+_Questions didactiques dans le td :_
+
+L'objectif n'est pas forcément pour vous de comprendre en détail tout le code R. Concentrez vous sur la compréhension des étapes, l'objectif général des fonctions et l'interprétation des résultats. Si la curiosité vous démange, vous êtes bien sur invité à creuser le code contenu dans le package `td_functions`.
+
+De questions sont réparties tout au long du td pour vous guider dans la compréhension des étapes. Elles sont là a but didactique. N'hésitez pas à faire des recherches internet/chatgpt pour comprendre les fonctions. Chatgpt ne fonctionnera pas avec les fonctions customs du package `td_functions` mais peut être une aide pour les fonctions des packages publics Munissez vous aussi d'un code génétique.
+
+Vous pouvez nous envoyer vos réponses si vous le souhaitez. Nous vérifierons la bonne compréhension et pourrons discuter de vos interprétation. Ce n'est pas obligatoire.
+
+
+Voilà l'ensemble des information pour le td. Posez vous des questions et bon courage.
+
+# 1. Installation et chargement des outils/données nécessaires au td
+### Installation des packages nécéssaires :
+```{r message=FALSE, warning=FALSE}
+#if (!requireNamespace("BiocManager", quietly = TRUE)) {
+#  install.packages("BiocManager")
+#}
+#BiocManager::install("Biostrings")
+#BiocManager::install("rtracklayer")
+```
+
+### Chargement des packages :
+```{r setup, message=FALSE, warning=FALSE}
+library(Biostrings)
+library(rtracklayer)
+library(dplyr)
+library(ggplot2)
+library(tidyr)
+
+library(devtools)
+path_to_material='/Users/gouzien-c/Downloads/TD taux de croissance _ Oligotrophie/TD_joux_materiel/' # CHANGER LE PATH PAR CELUI MENNANT AU DOSSIER TD_joux_materiel 
+
+#propagate the working directory to all chunk of code :
+knitr::opts_knit$set(root.dir = path_to_material) 
+knitr::opts_knit$get("root.dir")
+knitr::opts_chunk$set(root.dir = path_to_material)
+knitr::opts_chunk$get("root.dir")
+devtools::load_all(paste0(path_to_material,"td_functions/"))
+
+```
+
+
+Tous les packages chargés par la fonction `library()` sont publics. Si ces packages ne sont pas installés sur votre ordinateur, entrez `install.packages('nom_du_package')` dans votre console R (en bas à gauche dans Rstudio). Le package sera automatiquement installé dans le dossier prévu à cet effet sur votre ordinateur.
+Le package custom nommé `td_functions` est chargé par la fonction `devtools::load_all()`. 
+
+Pour vous simplifier la tache, l'ensemble du matériel non public utile au td, dont le package custom `td_functions`, a été regroupé dans le dossier `TD_joux_materiel` disponible sur Moodle. Téléchargez ce dossier, *décompressez-le*, puis modifiez le chemin de la commande `path_to_material` par le chemin menant au dossier `TD_joux_materiel` nouvellement téléchargé. 
+Ex sur l'ordinateur de Pauline Dupont, Windows il faudra mettre quelque chose comme: `path_to_material='C:/Users/p_dupont/Downloads/TD taux de croissance _Oligotrophie/TD_joux_materiel'`
+Ex su le Mac de Paul Dupond : `path_to_material='/User/p-dupond/Downloads/TD taux de croissance _Oligotrophie/TD_joux_materiel'`
+
+
+
+
+### Chargement des séquences :
+Pour débuter, nous allons charger le génome (.fna) de l'organisme d’intérêt et son fichier d'annotation (.gff) : 
+```{r}
+bacteria="Synechococcus_elongatus_PCC_6301"
+path_to_genome='Synechococcus_elongatus_PCC_6301_genome.fna'
+path_to_annotations='Synechococcus_elongatus_PCC_6301_genome.gff'
+
+genome_sequence=Biostrings::readDNAStringSet(path_to_genome, format = "fasta")
+
+print(names(genome_sequence))
+if (length(genome_sequence)>1){
+  genome_sequence=genome_sequence[grep("chromosome", names(genome_sequence))] #when a bacteria has several chromosomes +plasmids (like in Vibrio's, see the lecture by F. joux), we keep only the  chromosome caring housekeeping genes.
+}
+annotations=rtracklayer::import(path_to_annotations)
+annotations_df <- as.data.frame(annotations)
+
+```
+
+Visualisons la séquence complète chargée dans R :
+```{r}
+genome_sequence
+```
+<u> Quelle est la longueur de cette séquence ? </u>
+
+
+Visualisons les 6 permières lignes du tableau d’annotation :
+```{r}
+head(annotations_df)
+```
+<u> Décrivez l'information comprise dans chaque colonne du tableau .gff </u> 
+
+
+# 2. Obtenir un CUB à partir d'un génome annoté : comparaison de deux méthodes
+
+### a. Du génome brute aux codons
+Nous avons réussi à charger le fichier de séquence et le fichier d'annotation. Commençons l'analyse en extrayant les gènes d'intérêt. Nous utilisons des filtres codés dans la fonction `extract_genes_based_on_functional_annotation` du  package custom. Si vous voulez comprendre plus en détail le code de cette fonction, n'hésitez pas à la chercher dans le fichier _functions_TD_gouzien_joux.R_. 
+
+Le premier filtre permet de sélectionner dans le fichier d'annotation les gènes relatifs aux ribosomes. Nous sélectionnons ces gènes car ce sont des gènes fortement exprimés lors des phases de croissance des bactéries. Ils sont susceptibles de subir des mécanismes de sélection vers une croissance optimisée. Le deuxième filtre permet d'enlever dans les gènes ribosomiques ceux qui n'ont pas d'identifiant de protéine (protein_id). Cela revient à enlever les gènes qui ne sont pas traduits en protéines. Pourquoi ?
+
+Nous retirons ici tous les gènes des ARN ribosomiques (des ARN fonctionnels comme celui provenant du gène 16S, mais non traduits en protéine). Ces ARN ne sont pas traduits donc n'interagissent pas avec les ARNt dans les ribosomes. Il ne sont pas porteurs d'un signal de sélection permettant une optimisation de la traduction. Si nous gardons ces gènes dans la suite de l'analyse, nous risquons de diluer le signal de sélection calculé par le CUB. Voilà pourquoi nous les retirons.
+
+
+```{r}
+ribosomal_genes=td_functions::extract_genes_based_on_functional_annotation('ribosomal',annotations_df,exclude = F)
+head(ribosomal_genes)
+dim(ribosomal_genes)
+
+```
+<u>A quoi correspondent les chiffres 59 et 35 ? </u>
+<u>Quelles sont les différences entre les gènes indiqués comme "-" et comme "+" de la colonne strand ? (réponse ci après)</u>
+
+Maintenant que nous avons sélectionné nos gènes d'intérêt, extrayons en les codons. Combinons pour cela les informations d'annotation et le fichier de séquence. Mais attention. Il y a quelques pièges à éviter.
+
+Nous devons tenir compte des conventions de notations. Pour simplifier les fichiers de séquence, on y retrouve généralement seulement un des deux brins de la double hélice. Le second brin se déduit facilement par complémentarité des nucléotides (A en face de T, C en face de G).  Pourtant, des gènes sont présents sur les deux brins d'ADN. Il faut donc une notation pour discriminer la situation ou la séquence codante est celle du fichier .fna (à T->U près) VS la situation où la séquence codante est complémentaire au fichier .fna. La convention est la suivante: 
+
+- Si le gène est "+" = la séquence codante est directement celle du fichier .fna. Pourquoi ? (rappel) : dans ce cas, l'ARN polymérase se déplace sur le brin "-". Le brin "-" est le brin matrice/template, qui est le brin complémentaire au fichier .fna, donc non présent dans le fichier .fna. L'ARN polymérase avance dans le sens 3'->5' du brin template (car le brin d'ARN croit par le groupement alcool de l'extrémité 3') et construit un ARNm dont la séquence est presque identique à celle du brin "+" (le brin du fichier .fna). Presque identique car l'ARNm est obtenu en remplaçant simplement les T par des U. 
+
+- Si le gène est "-" = il faut inverser (i) et transposer (ii) la séquence du .fna pour obtenir la séquence codante. Pourquoi ? (rappel) : (i) l'ARN polymérase se déplace dans ce cas-ci sur le brin "+". Le brin "+" est le brin du fichier .fna. L'ARN polymérase avance toujours dans le sens 3'->5'du brin "+". Or le brin "+" est orienté dans le sens 5'->3' dans le fichier .fna.  C'est comme si l'ARN polymérase "lisait" le gène/le fichier .fna de droite à gauche. Dans notre langage, nous lisons les mots de gauche à droite. Pour simplifier les analyses futures et se conformer au sens de lecture des gènes "+", nous convertissons ces mots écrits de "droite à gauche" en "gauche à droite". D'où la nécessité d'inverser l'ordre de la séquence quand un gène est noté "-". Le début devient la fin. (ii) Comme l'ARN polymérase avance sur le brin "+", l'ARNm construit est similaire au brin "-" (à T->U près) et complémentaire au brin "+" du fichier .fna. Or le fichier .fna ne contient que le brin "+". Pour avoir la séquence du gène, on prend le complémentaire du fichier .fna. Puis on remplace le T par une U pour avoir l'ARNm.
+
+Il faut avoir en tête que les complexe protéiques, tel que l'ARN polymérase n'ont que faire du sens "+" et "-". Ces sens sont des artifices, des étiquettes apposées par les scientifiques pour identifier clairement la séquence désignée. Dans la cellule, un gène est transcrit en ARNm si les bons promoteurs sont présent en amont du gène. L'ARN polymérase se fixe aussi bien  sur le sens "+" et "-" sans aucune préférence, sans conscience. Pour ce complexe protéique, un brin "+" ou un brin "-" ne sont qu'une seule et même chose. L'ARN polymérase avance dans le sens 3'->5' du brin matrice, guidée par la probabilité des préférences d'interactions chimiques. 
+
+<img src="/Users/gouzien-c/Downloads/schéma_gene+-.jpg"  />
+*Schéma illustrant la position de l'ARN polymérase transcrivant un gene + ou - en ARN messager*
+
+Cette fonction utilise les informations d'annotation pour extraire les séquences des gènes sélectionnés, en prenant le complémentaire inverse si nécessaire: 
+```{r}
+ribosomal_genes=td_functions::add_seq_to_annotation_df(ribosomal_genes,genome_sequence)
+```
+
+Cette fonction scinde les séquences extraites précdement en codons. Comme tous les gènes sont orientés dans le même sens (on a pris le complémentaire inverse pour les gènes "-"), nous découpons tous les gènes de gauche à droite, en partant du codon start jusqu'au premier codon stop rencontré.
+```{r}
+ribosomal_genes_scliced=td_functions::add_sliced_codons_to_annotaion_df(ribosomal_genes)
+head(ribosomal_genes_scliced)
+```
+
+Nous avons désormais la liste de codons pour chaque protéine ribosomique. Nous pouvons étudier le biais de codon associé. 
+
+### b. Biais de codon sans appriori : la methode de  Wright 1990
+
+#####  Visualisation des fréquences non uniformes
+Pour observer la présence ou non de biais de codon, nous allons représenter la répartition des fréquences par codon synonyme et la comparer à une distribution uniforme (voir _Comprendre le CUB_ en intro) :
+
+Nous répertorions pour chaque acide aminé l'ensemble des codons correspondant. Nous faisons cela pour chaque séquence sélectionnée. (ex: Seq1_Lys :AAA, AAG, AAG, AAA, AAG, AAG, AAA, Seq1_ARg : ... ,Seq2_Lys : AAG, AAA, AAG,... etc...)
+
+```{r message=FALSE}
+repartition_codons=td_functions::attribute_codons_to_amino_acid(ribosomal_genes_scliced)
+```
+
+Nous créons un dictionnaire pour connaitre la correspondance entre les acides aminés aux codons. Ce dictionnaire sera un outil utilisé dans la suite de l'analyse.
+
+```{r}
+aminoacid_to_codons <- new.env()
+for (codon in names(Biostrings::GENETIC_CODE)){
+  amino_acid <- Biostrings::GENETIC_CODE[codon]
+  
+  
+  if (!exists(amino_acid, envir = aminoacid_to_codons)) {
+    aminoacid_to_codons[[amino_acid]] <- c()
+  }
+  aminoacid_to_codons[[amino_acid]] <- append(aminoacid_to_codons[[amino_acid]], codon)
+}
+```
+
+Nous comptons pour chaque acide aminé le nombre de codon correspondants et on fait attention à rajouter un 0 pour les codons dont l’occurrence est nulle. (ex : Seq1_Lys: AAA=3, AAG=4 ;Seq2_Lys: AAA=26, AAG=46....)
+```{r}
+per_amino_acid_total=td_functions::count_codons_per_amino_acids(repartition_codons,aminoacid_to_codons)
+```
+Nous vérifions visuellement que nous retrouvons le bon nombre de codons synonymes par acide aminé.
+```{r}
+for (amino_acid in ls(per_amino_acid_total)[1:10]) {
+  print(amino_acid)
+  print(length(per_amino_acid_total[[amino_acid]]))
+  }
+```
+<u> Essayez de comprendre ce que fait le code, ligne par ligne, de la cellule précédente : avons-nous bien le bon nombre de codons synonymes par acide aminé ?</u>
+
+Nous transférons ces données dans un data_frame (tableau sous R) et convertissons les occurrences en fréquences pour faciliter la suite de l'analyse. Nous ajoutons aussi une colonne pour la probabilité théorique attendu sans biais. Cette probabilité est simplement égale à 1/(nombre de codons synonymes pour cet acid aminé). Car en théorie, tous les codons synonymes ont la même probabilité d'exister dans un génome. Si une fréquence s'écarte de cette probabilité, cela veut dire qu'il y a un biais de codon.
+```{r}
+per_amino_acid_freq_df=td_functions::convert_data_for_plotting(per_amino_acid_total)
+head(per_amino_acid_freq_df)
+
+```
+
+Nous rassemblons toutes ces fonctions en une pour obtenir directement le plot à partir des données brutes. 
+```{r message=FALSE}
+
+df_for_plot=td_functions::from_annotation_to_plot(annotations_df,genome_sequence,'ribosomal',aminoacid_to_codons)
+td_functions::draw_frequency_plot(df_for_plot,title='Visualisation of the codon frequency bias among aminoacids of ribosomal proteins')
+
+```
+
+<u>Identifiez un codon qui dépasse la probabilité uniforme attendue dans un contexte d' équiprobabilité. Identifiez un codon qui égale la probabilité uniforme attendue dans un contexte d’ équiprobabilité. </u>
+<u>Quelle était la probabilité attendu pour le codon CCT ? Pour quel acide aminé code CCT</u>
+
+Réiterons maintenant ce plot en prenant tous les autres gènes codant des protéines autres que ribosomiques. Comparer biais de codon des gènes ribosomiques au biais de codon des autres gènes sera notamment utile dans la troisième partie du TD. 
+
+**ATTENTION, nous allons appliquer la fonction à l'ensemble des gènes de l’ organisme (plusieurs milliers). C'est sensé tourner en quelques secondes. Si votre ordinateur est trop lent (le graphique prend plus de 3min à s'afficher), arrêtez la fonction et relancez la en changeant le paramètre percent=1 à percent=n/100. Cela va prendre aléatoirement n-pourcent des gènes non ribosomiques, mais cela devrait être suffisant pour avoir un graphique informatif. Ne choisissez pas un n trop petit (n<5), car vous risquez de drastiquement baisser la pertinence statistique de l' échantillonnage aléatoire.**
+
+```{r message=FALSE}
+df_for_plot=td_functions::from_annotation_to_plot(annotations_df,genome_sequence,'ribosomal',aminoacid_to_codons,to_exclude = T,percent = 1)
+td_functions::draw_frequency_plot(df_for_plot,title='Visualisation of the codon frequency bias among non ribosomal aminoacids')
+
+```
+
+
+<u>Comparez ce graphique au précédent. Quelles différences il y a t il entre gènes ribosomiques et gènes non ribosomiques. Quel groupe de gène vous semble le plus baisé ? </u>
+<u> Le génome de Synechococcus vous semble t'il riche en GC, riche en TA, équilibré ? </u>
+
+#####  Obtention du CUB
+
+Nous allons calculer le biais de codon tel que défini par Wright en 1990. Cette métrique va rassembler les acides aminés ayant le même nombre de codons synonymes ensembles. Nous obtenons un biais moyen pour les acides aminés ayant 1 codon synonyme (une valeur résumant le biais pour Met & Trp), un biais moyen pour les acides aminés ayant 2 codons synonymes (une valeur résumant le biais pour Phe,Tyr,Cys,His,Gln,Glu,Asn,Asp,Lys), 3 codons (idem pour Ile), 4 codons (idem pour Gly,Pro,Ala,Val,Thr), 6 codons (idem pour Leu,Ser,Arg). Cette méthode est critiquée par Fulsang en 2004, mais c'est la méthode historiquement utilisée car elle présente de nombreux avantages (voir Wright 1990). Nous allons donc représenter ce biais moyen par famille d'acides aminés (une famille étant formée par l'ensemble des acides aminés ayant n codons. donc n appartient à {1,2,3,4,6}).
+
+*Tableau résumé du nombre de codons synonymes par acide aminé :*
+
+acide aminé|nombre de codons synonymes|
+---|:---:|
+Leu, Ser, Arg|6
+Gly, Pro, Ala, Val, Thr|4
+Ile|3
+Phe, Tyr, Cys, His, Gln, Glu, Asn, Asp, Lys|2
+Met, Trp|1
+
+
+Je ne détaille pas les fonctions permettant d'obtenir ces valeurs car l'interprétation des formules n'est pas évidente. Retenez juste que ça marche : la formule permet d'obtenir une métrique qui possède les caractéristiques qu'on lui demande.  
+```{r}
+per_amino_acid_freq_df=td_functions::convert_data_for_plotting(per_amino_acid_total)
+
+per_amino_acid_freq_df=td_functions::compute_effective_number_of_codon_usage(per_amino_acid_freq_df )
+td_functions::plot_effective_number_of_codon_usage(per_amino_acid_freq_df,"Plot of the effective number of codons calculated from Wright 1990 \nfor ribosomal genes")
+cub_wrigth=td_functions::compute_cub(per_amino_acid_freq_df)
+print(paste0("CUB= ",cub_wrigth))
+```
+<u>Pourquoi les valeurs d'effective number of codons sont identiques entre (M et W) et entre (A et T) ? </u>
+
+<u> Quelle est votre intution concernant cette valeur de cub ? Est-ce élevé? Pq? Est-ce faible ?Pq? </u> 
+Une aide à l'interprétation se trouve dans Fulgsang, 2004
+
+
+### c. Biais de codon avec appriori sur la composition en ATCG des genomes : la méthode de November 2002
+
+Il existe des différences de taux de ATCG dans les génomes. Certains sont enrichis en TA, d'autres en CG. Si un génome est très riche en CG, il est plus probable que les codons composés de CG prédominent face aux codons riches en TA. (ex: genome riche en GC, la fréquence en AGC<AGT pour coder une Ser). Pour que le biais de codons reflète une différence entre répartition attendue/répartition observée des codons liée à des mécanismes évolutifs, il faut que notre répartition attendue prenne compte de ces fréquences en nucléotides dans les génomes. Cette propriété des génomes n'est pas prise en compte par Wright dans sa méthode.
+
+Dans _Accounting for Background Nucleotide Composition When Measuring Codon Usage Bias, Novembre 2002_, November développe une méthode basée sur celle de Wright en ajoutant une correction du CUB par la composition des génomes.
+
+```{r message=FALSE}
+per_amino_acid_freq_df=td_functions::from_annotation_to_plot(annotations_df,genome_sequence,'ribosomal',aminoacid_to_codons,to_exclude = F,percent = 1)
+
+per_amino_acid_freq_df=td_functions::compute_corrected_effective_number_of_codon_usage(per_amino_acid_freq_df)
+td_functions::plot_effective_number_of_codon_usage(per_amino_acid_freq_df, title="Plot of the effective number of codons calculated from November 2002 \nfor ribosomal genes" )
+cub_nov_ribo=td_functions::compute_cub(per_amino_acid_freq_df)
+print(paste0("CUB= ",cub_nov_ribo))
+
+```
+<u>Pouvez-vous identifier les différences entre le plot de Wright et November concernant les genes ribosomiques ? Quels sont les acides aminés ayant subit la forte correction par la teneur en GCTA de leur génome ?</u>
+
+```{r message=FALSE}
+per_amino_acid_freq_df=td_functions::from_annotation_to_plot(annotations_df,genome_sequence,'ribosomal',aminoacid_to_codons,to_exclude = T,percent = 1)
+
+per_amino_acid_freq_df=td_functions::compute_corrected_effective_number_of_codon_usage(per_amino_acid_freq_df)
+td_functions::plot_effective_number_of_codon_usage(per_amino_acid_freq_df, title="Plot of the effective number of codons calculated from November 2OO2 \nfor non ribosomal genes" )
+cub_nov_all=td_functions::compute_cub(per_amino_acid_freq_df)
+print(paste0("CUB= ",cub_nov_all))
+```
+<u>Comparez les deux dernières valeurs de CUB. Est-ce cohérent par rapport aux différences attendues entre gène fortement et faiblement exprimés ?</u>
+
+
+# 3. Visualiser le lien entre CUB et taux de croissance
+
+Nous avons réussi à visualiser le biais de codon dans le génome et a obtenir des valeurs de CUB pour des gènes surexprimés(=ribosomiques) VS l'ensemble des autres gènes (=non ribosomiques). Nous allons désormais étudier comment ces métriques peuvent permettre de prédire un taux de croissance. Pour cela nous nous baserons sur la méthode publiée par Viera-Silva & Rocha en 2009. Ils calculent le ΔENC' ( appelé aussi le ΔCUB  ou ΔNC') qui vaut (CUB_all-CUB_ribosomique)/CUB_all. C'est pour ça que dans la première partie du td nous avons cherché à obtenir ces deux valeurs
+
+```{r}
+compute_delta_ENCprim <- function(CUB_all,CUB_ribo){
+  delta_ENCprim=(CUB_all-CUB_ribo)/CUB_all
+  return(delta_ENCprim)
+}
+
+compute_delta_ENCprim(cub_nov_all,cub_nov_ribo)
+```
+<u>Pouvez vous décrire ce que fait cette fonction R (quels sont ses inputs et ouputs, que fait chaque ligne, a-t-on bien l'ensemble des éléments syntaxiques nécessaires au code d'une fonction dans R ?) ?</u> 
+
+
+Dans la suite du td, le taux de croissance est noté d(h) pour doubling time per hour. C'est le nombre d'heures entre deux divisions cellulaires, donc homogène à un taux de croissance. Pour comparer notre Synechococcus elongatus (PCC_6301) à d'autres bactéries et calibrer nos modèles, nous prenons une liste de bactéries répertoriées dans Viera-Silva & Rocha en 2009. Toutes ces bactéries ont été cultivées en laboratoire et leur taux de croissance mesuré. Nous avons appliqué les mêmes filtres que ceux du début du td aux 195 autres bactéries présentent dans ce jeu de donnée. Nous avons également extrait d'autres métriques génomiques (nombres de copies du gene 16S, taux de GC, ...) et rassemblé toutes ces informations dans le tableau `genome_data`.
+```{r message=FALSE, warning=FALSE}
+
+genome_data=read.csv("all_computed_genome_info.csv")
+genome_data$color_group <- ifelse(genome_data$bacteria ==bacteria , bacteria, "others")
+
+
+regression_eq <- function(x,mu,slope){return(mu+x*slope)}
+
+plot_d_vs_condition <- function(data, condition) {
+  #This functions allow you to plot the correlation between a given condition of the genome_data df against the growth rate
+  condition <- as.character(substitute(condition))
+  formula <- reformulate(condition, response = "log10(d..h.)")
+  lm_fit <- lm(formula, data = data)
+
+  µ <- lm_fit$coefficients['(Intercept)']
+  slope <- lm_fit$coefficients[condition]
+
+
+  data <- data %>% mutate(expected_value = regression_eq(!!sym(condition), µ, slope))
+  data <- data %>%
+    mutate(rss = abs(log10(d..h.) - expected_value)) %>%
+    mutate(classification = ifelse(rss < 0.1, "good prediction", "bad prediction")) %>%
+    drop_na()
+
+  a_comprendre <- ggplot(data = data, aes_string(x = condition, y = "d..h.", color = "color_group"),size='colour_group') +
+    geom_point(aes(shape =  classification)) +
+    geom_abline(intercept = µ, slope = slope) +
+    labs( title = paste("Relationship between", condition, "and \nexperimental measured growth rate \n\n", "R² = ", round(summary(lm_fit)$r.squared, 3), "P value = ", sprintf("%.2e", anova(lm_fit)$'Pr(>F)'[1])), y = "d(h)",x = condition) +
+    scale_y_log10() +  # Logarithmic scale with labels
+    theme_minimal()
+
+  print(a_comprendre)
+  #data=data %>% dplyr::filter(classification=="well predicted")
+  #return(data)
+}
+
+plot_d_vs_condition(genome_data, delta_enc_prim)
+
+```
+
+<u> Pourriez vous expliquer comment expérience de paillasse et modèle bio informatique se complètent dans cette étude du taux de croissance ? Quels sont les limitations et biais de chaque discipline par rapport à notre étude du taux de croissance ?</u>
+<u>Pour les plus à l'aise en R, essayez de comprendre la syntaxe de la fonction ggplot permettant de construire l'objet "a_comprendre".</u>
+
+# 4. Visualiser le lien entre CUB et d'autres métriques génomiques
+
+Nous allons tenter de répondre à la question : A quel point le cub est un bon prédicteur du taux de croissance par rapport à d'autres métriques extraites du génome?
+
+```{r}
+plot_d_vs_condition(genome_data,"n_copy_16S")
+```
+
+
+```{r message=FALSE, warning=FALSE}
+genome_data=read.csv("all_computed_genome_info.csv")
+genome_data$color_group <- ifelse(genome_data$bacteria ==bacteria , bacteria, "others")
+genome_data <- genome_data %>% filter(n_chromosom<10)
+plot_d_vs_condition(genome_data,"n_chromosom")
+
+```
+
+
+
+
+
+```{r}
+genome_data=read.csv("all_computed_genome_info.csv")
+genome_data$color_group <- ifelse(genome_data$bacteria ==bacteria , bacteria, "others")
+plot_d_vs_condition(genome_data,"gc_rate")
+```
+
+```{r message=FALSE, warning=FALSE}
+
+genome_data=read.csv("all_computed_genome_info.csv")
+
+genome_data <- genome_data %>%
+  mutate(biggest_chromosome = if_else(
+    grepl(",", length_chromosom), 
+    sapply(strsplit(length_chromosom, ","), function(x) max(as.numeric(x))),
+    as.numeric(length_chromosom)
+  ))
+
+genome_data$color_group <- ifelse(genome_data$bacteria ==bacteria , bacteria, "others")
+plot_d_vs_condition(genome_data,"biggest_chromosome")
+```
+ 
+ <u>Quel paramètre du génome parmi les précédents est le plus corrélé aux taux de croissance d(h)? </u>
+ <u>Quelle aurait été la valeur de d(h) prédite par la corrélation entre d(h) et nombre de copie de 16S pour notre Synechococcus? </u>
+ (il est possible que le petit triangle bleu soit caché derrière un point rouge sur le plot n_copy_16S)
+ 
+
+#5. Pour aller plus loin : combiner CUB et autres métriques génomiques afin d'augmenter la puissance prédictive de notre modèle
+
+Quel est la meilleur façon de prédire le taux de croissance avec l'ensemble de ces métriques ? A partir des plots, le CUB semble le plus pertinent. Il est possible que le nombre de copy apporte de la valeur ajouté à la prédiction. Pour cela, créons un modèle linéaire combinant les paramètres et allons plus loin.
+Nous allons utiliser un modèle de régression multiple de type $y=µ_O + \sum \alpha_i*µ_i $. Si ce type de modèle ne vousa jamais été présenté en cours de statistiques, il vous faudra d'abord comprendre a théorie derrière ces modèles. Si vous êtes familiers avec ce type de statistque, 
+
+```{r message=FALSE, warning=FALSE}
+library(FactoMineR)
+library(ggcorrplot)
+library(GGally)
+library(relaimpo)
+
+
+selection_for_cor <- genome_data %>%
+  mutate(d..h. = log10(d..h.)) %>%  
+  dplyr::select(Ori, OGT, d..h., n_chromosom, biggest_chromosome, delta_enc_prim, n_copy_16S, gc_rate) %>% drop_na()
+selection_for_cor <- selection_for_cor %>% mutate(type=ifelse(gc_rate>0.50,"gc","ta"))
+selection_for_cor$type=as.factor(selection_for_cor$type)
+
+p=GGally::ggpairs(selection_for_cor,aes(fill=type),progress = F)
+p + theme(axis.text.x = element_text(angle = 65, hjust = 1),axis.text.y = element_text(angle = 0, hjust = 0.2))
+    
+
+```
+```{r}
+to_explain=selection_for_cor$d..h.
+variables=selection_for_cor %>% dplyr::select(-c(type,`d..h.`))
+FactoMineR::RegBest(to_explain,variables)
+```
+
+
+<u> Que fait la fonction `RegBest` du package factominer ? (renseignez vous en ligne et sur la chaine youtube de François Husson) </u>
+<u> Quels sont les paramètres rentrants en compte dans le meilleur modèle linéaire ? Quels sont les coefficients associés ? </u>
+
+Etudions désormais la contribution de chaque paramètre du meilleur modèle pour comprendre quels sont les paramètres les plus porteurs d'information.
+
+```{r}
+model_selection=FactoMineR::RegBest(to_explain,variables)
+
+predictors <- paste(attr(model_selection$best$terms, "term.labels"), collapse = " + ")
+
+formula_dynamic <- as.formula(paste("`d..h.`", "~", predictors))
+print(formula_dynamic)
+
+model <- lm(formula_dynamic, data = genome_data)
+print(model)
+
+metric <- calc.relimp(model, type = c("lmg"), rela=TRUE)
+print('Contributions :')
+print(as.data.frame(metric@lmg))
+print('end_contribution')
+```
+```{r}
+plot_contri_data <- data.frame(
+  Variable = c("OGT", "delta_enc_prim", "n_copy_16S", "gc_rate"),
+  Metric = metric@lmg
+)
+
+ggplot(plot_contri_data, aes(x = Variable, y = Metric, fill = Variable)) +
+  geom_bar(stat = "identity") +
+  theme_minimal() +
+  labs(title = "Bar Plot of explanatory power of the model metrics ",x = "Variables",y = "% of contibution to the explanatory\n power of the model") +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1)) 
+```
+
+<u> Quels sont les paramètres egalement présentés comme caractéristiques dans le cours de F.Joux sur l'oligotrophie ? Quels sont les paramètres en plus et en moins ? La contribution de chaque paramètre au modèle est -elle cohérente avec les valeurs de $R^2$ des plots précédents ? </u>
+
+
+
+*Merci d'avoir suivi ce td*
+
